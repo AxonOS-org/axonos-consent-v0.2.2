@@ -19,7 +19,15 @@
 //!
 //! Direct `suspend()/resume()/withdraw()` methods exist for internal use
 //! (e.g., emergency button bypass) but skip frame-level validation.
+impl Default for ConsentEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
+impl ConsentEngine {
+    pub const fn new() -> Self {
+        // ... 
 use crate::state::{ConsentState, TransitionError};
 use crate::reason::ReasonCode;
 use crate::frames::ConsentFrame;
