@@ -16,15 +16,20 @@ pub fn decode_value(v: &serde_json::Value) -> Result<ConsentFrame, &'static str>
     let obj = v.as_object().ok_or("expected JSON object")?;
     let ft = obj.get("type").and_then(|v| v.as_str()).ok_or("missing type")?;
     let rc = obj.get("reasonCode").and_then(|v| v.as_u64()).map(|v| ReasonCode::from_u8(v as u8));
-    let reason = obj.get("reason").and_then(|v| v.as_str()).map(ReasonBuf::from_str);
+    
+    // ИСПОЛЬЗУЕМ НОВЫЙ МЕТОД: new_from_str
+    let reason = obj.get("reason").and_then(|v| v.as_str()).map(ReasonBuf::new_from_str);
+    
     let ts_ms = obj.get("timestamp").and_then(|v| v.as_u64());
     let ts_us = obj.get("timestamp_us").and_then(|v| v.as_u64());
 
     match ft {
         "consent-withdraw" => {
-            let scope = Scope::from_str(
+            // ИСПОЛЬЗУЕМ НОВЫЙ МЕТОД: from_ident
+            let scope = Scope::from_ident(
                 obj.get("scope").and_then(|v| v.as_str()).ok_or("missing scope")?
             ).ok_or("unknown scope")?;
+            
             let epoch = obj.get("epoch").and_then(|v| v.as_u64());
             Ok(ConsentFrame::Withdraw(ConsentWithdraw {
                 scope, reason_code: rc, reason, epoch, timestamp_ms: ts_ms, timestamp_us: ts_us,
