@@ -30,39 +30,29 @@ pub struct ReasonBuf {
 
 impl ReasonBuf {
     pub const fn empty() -> Self {
-        Self {
-            buf: [0u8; MAX_REASON_LEN],
-            len: 0,
-        }
+        Self { buf: [0u8; MAX_REASON_LEN], len: 0 }
     }
 
     /// Create from a string slice. Truncates if longer than MAX_REASON_LEN.
-    /// Renamed from `from_str` to avoid conflict with `std::str::FromStr`.
-    pub fn new_from_str(s: &str) -> Self {
+    pub fn from_str(s: &str) -> Self {
         let bytes = s.as_bytes();
-        let copy_len = core::cmp::min(bytes.len(), MAX_REASON_LEN);
+        let copy_len = if bytes.len() > MAX_REASON_LEN { MAX_REASON_LEN } else { bytes.len() };
         let mut buf = [0u8; MAX_REASON_LEN];
-        
-        // Более эффективное копирование для no_std
-        buf[..copy_len].copy_from_slice(&bytes[..copy_len]);
-        
-        Self {
-            buf,
-            len: copy_len as u8,
+        let mut i = 0;
+        while i < copy_len {
+            buf[i] = bytes[i];
+            i += 1;
         }
+        Self { buf, len: copy_len as u8 }
     }
 
     pub fn as_str(&self) -> &str {
-        // Safety: we only ever write valid UTF-8 from new_from_str()
+        // Safety: we only ever write valid UTF-8 from from_str()
         core::str::from_utf8(&self.buf[..self.len as usize]).unwrap_or("")
     }
 
-    pub fn len(&self) -> usize {
-        self.len as usize
-    }
-    pub fn is_empty(&self) -> bool {
-        self.len == 0
-    }
+    pub fn len(&self) -> usize { self.len as usize }
+    pub fn is_empty(&self) -> bool { self.len == 0 }
 }
 
 impl core::fmt::Debug for ReasonBuf {
@@ -80,20 +70,10 @@ pub enum Scope {
 
 impl Scope {
     pub fn as_str(&self) -> &'static str {
-        match self {
-            Scope::Peer => "peer",
-            Scope::All => "all",
-        }
+        match self { Scope::Peer => "peer", Scope::All => "all" }
     }
-
-    /// Parse scope from MMP string identifier.
-    /// Renamed from `from_str` to avoid clippy::should_implement_trait.
-    pub fn from_ident(s: &str) -> Option<Self> {
-        match s {
-            "peer" => Some(Scope::Peer),
-            "all" => Some(Scope::All),
-            _ => None,
-        }
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s { "peer" => Some(Scope::Peer), "all" => Some(Scope::All), _ => None }
     }
 }
 
