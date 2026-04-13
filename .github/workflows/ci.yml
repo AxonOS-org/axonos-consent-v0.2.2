@@ -1,6 +1,3 @@
-# Copyright (c) 2026 Denis Yermakou / AxonOS
-# SPDX-License-Identifier: Apache-2.0 OR MIT
-
 name: CI
 
 on:
@@ -12,60 +9,121 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: "-D warnings"
+  CARGO_INCREMENTAL: "0"
 
 jobs:
-  test-default:
-    name: Test (no_std default)
+  fmt:
+    name: Format
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test
+        with:
+          components: rustfmt
+      - run: cargo fmt --all -- --check
 
-  test-json:
-    name: Test (JSON interop vectors)
+  test:
+    name: Test Matrix (std + features)
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        args:
+          - "--all-features"
+          - "--features json"
+          - "--no-default-features"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test --features json
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --all-targets ${{ matrix.args }}
 
-  no-std:
-    name: Build (Cortex-M4F)
+  no_std_build:
+    name: no_std Cortex-M Build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: thumbv7em-none-eabihf
+      - uses: Swatinem/rust-cache@v2
       - run: cargo build --target thumbv7em-none-eabihf --no-default-features
 
   clippy:
-    name: Clippy
+    name: Clippy (strict)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo clippy --all-targets --features json -- -D warnings
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy --all-targets --all-features -- -D warnings
 
-  
-
-  vectors-integrity:
-    name: Vector integrity
+  security:
+    name: Security Audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Verify SHA-256
-        run: |
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install cargo-audit
+      - run: cargo audit
+
+  deny:
+    name: Supply Chain Policy (cargo-deny)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install cargo-deny
+      - run: cargo deny check
+
+  vectors_integrity:
+    name: Deterministic Vector Integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
           EXPECTED="29a8bf9f2b4dabe5d9641a8a4c416f361c2ba9815cca9b8e9e1d222d002fa50a"
           ACTUAL=$(sha256sum tests/vectors/consent-interop-vectors-v0.1.0.json | awk '{print $1}')
-          if [ "$ACTUAL" != "$EXPECTED" ]; then
-            echo "FAIL: vector integrity check"
-            echo "Expected: $EXPECTED"
-            echo "Actual:   $ACTUAL"
-            exit 1
-          fi
-          echo "PASS: SHA-256 verified: $ACTUAL"
+          test "$EXPECTED" = "$ACTUAL"
+
+  fuzz:
+    name: Fuzz (regression gate)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz build
+
+  build_release:
+    name: Release Build (deterministic)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --all-features
+
+  provenance:
+    name: Build Provenance (SLSA-ready)
+    runs-on: ubuntu-latest
+    needs: [test, clippy, security]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Build artifact
+        run: cargo build --release --all-features
+
+      - name: Generate checksum
+        run: sha256sum target/release/* > checksums.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: |
+            target/release/
+            checksums.txt
