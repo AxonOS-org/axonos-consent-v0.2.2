@@ -9,6 +9,7 @@ repository = "https://github.com/AxonOS-org/axonos-consent"
 keywords = ["bci", "consent", "mmp", "real-time", "no_std"]
 categories = ["embedded", "no-std"]
 readme = "README.md"
+rust-version = "1.75"
 
 [features]
 default = []
