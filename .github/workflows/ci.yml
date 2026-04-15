@@ -15,16 +15,6 @@ env:
   CARGO_INCREMENTAL: "0"
 
 jobs:
-  if: false
-  fmt:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt
-      - run: cargo fmt --all -- --check
-
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -66,14 +56,6 @@ jobs:
       - run: cargo install cargo-audit
       - run: cargo audit
 
-  deny:
-    if: false
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: cargo install cargo-deny
-      - run: cargo deny check
-
   vectors:
     runs-on: ubuntu-latest
     steps:
@@ -108,7 +90,6 @@ jobs:
             checksums.txt
 
   reproducible:
-    if: false
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -138,7 +119,6 @@ jobs:
       - run: cargo doc --no-deps --all-features
 
   provenance:
-  if: false
     runs-on: ubuntu-latest
     needs: [release]
     permissions:
