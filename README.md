@@ -25,7 +25,16 @@ Joint paper: *"Protocol-Level Consent for Cognitive Mesh Coupling"* — built on
 > — [Hongwei Xu](https://sym.bot), Founder of SYM.BOT
 
 ---
+AxonOS CI is a combinatorial verification pipeline covering:
+- toolchains (stable/beta/nightly)
+- operating systems (Linux/macOS/Windows)
+- targets (x86_64, ARM, WASM, Cortex-M)
+- feature flags (core / interoperability)
 
+with integrated:
+- memory safety (Miri)
+- dependency auditing
+- cryptographic vector validation
 ## Layer positioning
 
 The MMP Consent Extension is a **protocol specification**. It defines frame types, a per-peer state machine, and conformance vectors. It says nothing about **how** implementations execute — that is left to each execution environment.
