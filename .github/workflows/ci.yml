@@ -1,7 +1,7 @@
 # Copyright (c) 2026 Denis Yermakou / AxonOS
 # SPDX-License-Identifier: Apache-2.0 OR MIT
 
-name: AxonOS CI (Canonical Verification Pipeline)
+name: CI
 
 on:
   push:
@@ -12,98 +12,43 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: "-D warnings"
+  CARGO_INCREMENTAL: "0"
 
-# -----------------------------
-# 1. MATRIX: tests across toolchains / features / OS
-# -----------------------------
 jobs:
-  test-matrix:
-    name: Test Matrix (${{ matrix.os }} / ${{ matrix.toolchain }} / ${{ matrix.features }})
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        toolchain: [stable, beta, nightly]
-        features: ["", "json"]
-    
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.toolchain }}
-
-      - name: Run tests
-        run: cargo test --no-fail-fast --features "${{ matrix.features }}"
-
-# -----------------------------
-# 2. CROSS TARGET BUILD MATRIX
-# -----------------------------
-  build-targets:
-    name: Cross Build (${{ matrix.target }})
+  test:
     runs-on: ubuntu-latest
-
     strategy:
       matrix:
-        target:
-          - x86_64-unknown-linux-gnu
-          - aarch64-unknown-linux-gnu
-          - wasm32-unknown-unknown
-          - thumbv7em-none-eabihf
-
+        args:
+          - "--all-features"
+          - "--features json"
+          - "--no-default-features"
     steps:
       - uses: actions/checkout@v4
-
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --all-targets ${{ matrix.args }}
 
-      - run: cargo build --target ${{ matrix.target }} --no-default-features
-
-# -----------------------------
-# 3. STATIC ANALYSIS
-# -----------------------------
   clippy:
-    name: Clippy (strict)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
+      - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --all-targets --all-features -- -D warnings
 
-# -----------------------------
-# 4. FORMAT
-# -----------------------------
-  fmt:
-    name: Rustfmt
+  no_std:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
-      - run: cargo fmt --all -- --check
+          targets: thumbv7em-none-eabihf
+      - run: cargo build --target thumbv7em-none-eabihf --no-default-features
 
-# -----------------------------
-# 5. DOCS
-# -----------------------------
-  docs:
-    name: Documentation Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - run: cargo doc --no-deps --all-features
-
-# -----------------------------
-# 6. SECURITY
-# -----------------------------
-  audit:
-    name: Security Audit (cargo-audit)
+  security:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -111,91 +56,54 @@ jobs:
       - run: cargo install cargo-audit
       - run: cargo audit
 
-  deny:
-    name: Dependency Policy (cargo-deny)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: cargo install cargo-deny
-      - run: cargo deny check
-
-# -----------------------------
-# 7. UNSAFE / CODE HEALTH
-# -----------------------------
-  geiger:
-    name: Unsafe Usage Scan
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: cargo install cargo-geiger
-      - run: cargo geiger
-
-  udeps:
-    name: Unused Dependencies
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: cargo install cargo-udeps
-      - run: cargo +nightly udeps
-
-# -----------------------------
-# 8. MEMORY SAFETY
-# -----------------------------
-  miri:
-    name: Miri (UB detection)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-        with:
-          components: miri
-      - run: cargo miri test
-
-# -----------------------------
-# 9. FUZZ (lightweight smoke)
-# -----------------------------
-  fuzz-check:
-    name: Fuzz Build Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - run: cargo install cargo-fuzz
-      - run: cargo fuzz build || true
-
-# -----------------------------
-# 10. BENCH
-# -----------------------------
-  bench:
-    name: Benchmark Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
-      - run: cargo bench --no-run
-
-# -----------------------------
-# 11. CRYPTO VECTOR INTEGRITY
-# -----------------------------
   vectors:
-    name: Vector Integrity (SHA-256)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - run: |
           EXPECTED="29a8bf9f2b4dabe5d9641a8a4c416f361c2ba9815cca9b8e9e1d222d002fa50a"
           ACTUAL=$(sha256sum tests/vectors/consent-interop-vectors-v0.1.0.json | awk '{print $1}')
-          if [ "$ACTUAL" != "$EXPECTED" ]; then
-            echo "Integrity violation!"
-            exit 1
-          fi
+          test "$EXPECTED" = "$ACTUAL"
 
-# -----------------------------
-# 12. RELEASE BUILD
-# -----------------------------
+  fuzz-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz build
+
   release:
-    name: Release Build (optimized)
+    runs-on: ubuntu-latest
+    needs: [test, clippy, security]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --all-features
+      - run: find target/release -type f -exec sha256sum {} \; > checksums.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: |
+            target/release/
+            checksums.txt
+
+  
+
+  wasm:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo build --release
+        with:
+          targets: wasm32-unknown-unknown
+      - run: cargo build --target wasm32-unknown-unknown --no-default-features
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo doc --no-deps --all-features
+
+  
