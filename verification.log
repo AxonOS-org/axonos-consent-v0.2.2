@@ -1,0 +1,8 @@
+   Compiling axonos-consent v0.2.2 (/Users/pc/Desktop/axonos-consent)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.30s
+     Running unittests src/lib.rs (target/debug/deps/axonos_consent-f7661a02d5d65cbd)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
