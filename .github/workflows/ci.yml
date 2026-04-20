@@ -91,4 +91,111 @@ jobs:
 # -----------------------------
 # 5. DOCS
 # -----------------------------
-  docs
+  docs:
+    name: Documentation Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo doc --no-deps --all-features
+
+# -----------------------------
+# 6. SECURITY
+# -----------------------------
+  audit:
+    name: Security Audit (cargo-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install cargo-audit
+      - run: cargo audit
+
+  deny:
+    name: Dependency Policy (cargo-deny)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo install cargo-deny
+      - run: cargo deny check
+
+# -----------------------------
+# 7. UNSAFE / CODE HEALTH
+# -----------------------------
+  geiger:
+    name: Unsafe Usage Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo install cargo-geiger
+      - run: cargo geiger
+
+  udeps:
+    name: Unused Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo install cargo-udeps
+      - run: cargo +nightly udeps
+
+# -----------------------------
+# 8. MEMORY SAFETY
+# -----------------------------
+  miri:
+    name: Miri (UB detection)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: miri
+      - run: cargo miri test
+
+# -----------------------------
+# 9. FUZZ (lightweight smoke)
+# -----------------------------
+  fuzz-check:
+    name: Fuzz Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz build || true
+
+# -----------------------------
+# 10. BENCH
+# -----------------------------
+  bench:
+    name: Benchmark Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo bench --no-run
+
+# -----------------------------
+# 11. CRYPTO VECTOR INTEGRITY
+# -----------------------------
+  vectors:
+    name: Vector Integrity (SHA-256)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          EXPECTED="29a8bf9f2b4dabe5d9641a8a4c416f361c2ba9815cca9b8e9e1d222d002fa50a"
+          ACTUAL=$(sha256sum tests/vectors/consent-interop-vectors-v0.1.0.json | awk '{print $1}')
+          if [ "$ACTUAL" != "$EXPECTED" ]; then
+            echo "Integrity violation!"
+            exit 1
+          fi
+
+# -----------------------------
+# 12. RELEASE BUILD
+# -----------------------------
+  release:
+    name: Release Build (optimized)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
