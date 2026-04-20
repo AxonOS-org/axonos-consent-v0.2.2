@@ -48,10 +48,6 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
-#![warn(missing_docs)]
-#![warn(missing_debug_implementations)]
-#![warn(rust_2018_idioms)]
-#![doc(html_root_url = "https://docs.rs/axonos-consent/0.2.2")]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

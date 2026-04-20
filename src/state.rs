@@ -48,6 +48,7 @@ impl ConsentState {
     /// `ConsentState` × `ConsentFrame` (3 states × 3 frame types = 9 cells).
     /// Every cell is explicitly handled. No wildcard `_` arms exist.
     /// Adding a new state or frame type will produce a compile error.
+    #[must_use]
     pub fn apply_frame(self, frame: &ConsentFrame) -> Result<ConsentState, TransitionError> {
         match (self, frame) {
             // WITHDRAWN is terminal — reject everything
@@ -69,6 +70,7 @@ impl ConsentState {
 
     // --- Convenience methods (delegate to apply_frame semantics) ---
 
+    #[must_use]
     pub fn suspend(self) -> Result<ConsentState, TransitionError> {
         match self {
             Self::Granted => Ok(Self::Suspended),
@@ -77,6 +79,7 @@ impl ConsentState {
         }
     }
 
+    #[must_use]
     pub fn resume(self) -> Result<ConsentState, TransitionError> {
         match self {
             Self::Suspended => Ok(Self::Granted),
@@ -85,6 +88,7 @@ impl ConsentState {
         }
     }
 
+    #[must_use]
     pub fn withdraw(self) -> Result<ConsentState, TransitionError> {
         match self {
             Self::Granted | Self::Suspended => Ok(Self::Withdrawn),
