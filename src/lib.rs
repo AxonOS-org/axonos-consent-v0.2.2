@@ -6,10 +6,12 @@
 
 //! # axonos-consent
 //!
-//! MMP Consent Extension v0.1.0 — reference implementation.
-//! Aligned with MMP v0.2.2 (Section 16.4).
+//! MMP Consent Extension v0.1.0 — Rust reference implementation.
+//! Aligned with MMP v0.2.3 (Section 16.4).
 //!
-//! Spec: <https://sym.bot/spec/mmp-consent>
+//! Specification: MMP Consent Extension v0.1.0 — authored by SYM.BOT,
+//! published under CC-BY-4.0.
+//!
 //! Protocol version: `CONSENT_PROTOCOL_VERSION = 1`
 //!
 //! ## Single entry point
@@ -48,6 +50,10 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 #![forbid(unsafe_code)]
+#![warn(missing_docs)]
+#![warn(missing_debug_implementations)]
+#![warn(rust_2018_idioms)]
+#![doc(html_root_url = "https://docs.rs/axonos-consent/0.2.2")]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

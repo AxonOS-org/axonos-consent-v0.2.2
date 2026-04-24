@@ -1,7 +1,7 @@
 {
   "_meta": {
     "description": "MMP Consent Extension v0.1.0 — Interop Test Vectors",
-    "spec": "https://sym.bot/spec/mmp-consent",
+    "spec": "MMP Consent Extension v0.1.0 (SYM.BOT, CC-BY-4.0)",
     "producer": "axonos-consent v0.1.0 (Rust, #![no_std])",
     "consumer": "sym (Node.js) / sym-swift (iOS/macOS)",
     "author": "Denis Yermakou <axonosorg@gmail.com>",
