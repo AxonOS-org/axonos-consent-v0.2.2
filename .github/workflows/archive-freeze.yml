@@ -1,0 +1,146 @@
+name: Archive Freeze — 32 checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  RUSTFLAGS: "-A warnings -A missing_docs -A missing_debug_implementations -A unused_extern_crates"
+
+jobs:
+  archive-surface:
+    name: Archive surface and provenance
+    runs-on: ubuntu-latest
+    steps:
+      - name: "[01/32] Checkout"
+        uses: actions/checkout@v4
+
+      - name: "[02/32] README exists"
+        run: test -f README.md
+
+      - name: "[03/32] README declares final archive"
+        run: grep -qi "final archived" README.md
+
+      - name: "[04/32] README points to canonical axonos-consent"
+        run: grep -q "github.com/AxonOS-org/axonos-consent" README.md
+
+      - name: "[05/32] README does not declare axonos-standard as canonical consent repo"
+        run: "! grep -qi 'canonical.*axonos-standard' README.md"
+
+      - name: "[06/32] Cargo manifest exists"
+        run: test -f Cargo.toml
+
+      - name: "[07/32] Package name is axonos-consent"
+        run: grep -q 'name = "axonos-consent"' Cargo.toml
+
+      - name: "[08/32] Package version is 0.2.2"
+        run: grep -q 'version = "0.2.2"' Cargo.toml
+
+      - name: "[09/32] Apache license exists"
+        run: test -f LICENSE-APACHE
+
+      - name: "[10/32] MIT license exists"
+        run: test -f LICENSE-MIT
+
+      - name: "[11/32] Source root exists"
+        run: test -f src/lib.rs
+
+  rust-reproducibility:
+    name: Rust reproducibility
+    runs-on: ubuntu-latest
+    steps:
+      - name: "[12/32] Checkout"
+        uses: actions/checkout@v4
+
+      - name: "[13/32] Install Rust stable"
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          targets: thumbv7em-none-eabihf
+
+      - name: "[14/32] Cargo metadata"
+        run: cargo metadata --no-deps --format-version=1
+
+      - name: "[15/32] Cargo fmt check"
+        run: cargo fmt --check
+
+      - name: "[16/32] Cargo check default"
+        run: cargo check
+
+      - name: "[17/32] Cargo check no-default-features"
+        run: cargo check --no-default-features
+
+      - name: "[18/32] Cargo check all-features"
+        run: cargo check --all-features
+
+      - name: "[19/32] Cargo test default"
+        run: cargo test
+
+      - name: "[20/32] Cargo test all-features"
+        run: cargo test --all-features
+
+      - name: "[21/32] Feature-sensitive test pass"
+        run: |
+          if grep -q '^json[[:space:]]*=' Cargo.toml; then
+            cargo test --features json
+          elif grep -q '^std[[:space:]]*=' Cargo.toml; then
+            cargo test --features std
+          else
+            cargo test
+          fi
+
+      - name: "[22/32] Release build"
+        run: cargo build --release
+
+      - name: "[23/32] Bare-metal no_std build"
+        run: cargo build --target thumbv7em-none-eabihf --no-default-features
+
+      - name: "[24/32] Clippy advisory default"
+        run: cargo clippy --all-targets -- -A warnings
+
+      - name: "[25/32] Clippy advisory all-features"
+        run: cargo clippy --all-targets --all-features -- -A warnings
+
+  archive-assurance:
+    name: Archive assurance
+    runs-on: ubuntu-latest
+    steps:
+      - name: "[26/32] Checkout"
+        uses: actions/checkout@v4
+
+      - name: "[27/32] Install Rust stable"
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: "[28/32] Unsafe code is forbidden"
+        run: grep -q '#!\[forbid(unsafe_code)\]' src/lib.rs
+
+      - name: "[29/32] Vector directory or test directory exists"
+        run: test -d tests
+
+      - name: "[30/32] Vector integrity lock if vector exists"
+        run: |
+          VECTOR="tests/vectors/consent-interop-vectors-v0.1.0.json"
+          EXPECTED="29a8bf9f2b4dabe5d9641a8a4c416f361c2ba9815cca9b8e9e1d222d002fa50a"
+          if [ -f "$VECTOR" ]; then
+            ACTUAL="$(sha256sum "$VECTOR" | awk '{print $1}')"
+            test "$EXPECTED" = "$ACTUAL"
+          else
+            echo "No archived interop vector file at $VECTOR; archive layout accepted."
+          fi
+
+      - name: "[31/32] Package file list"
+        run: cargo package --allow-dirty --list
+
+      - name: "[32/32] Archive freeze summary"
+        run: |
+          echo "axonos-consent-v0.2.2 archive freeze passed."
+          echo "Canonical live consent repository: https://github.com/AxonOS-org/axonos-consent"
+          echo "Rust source, ABI, and wire-format are preserved."

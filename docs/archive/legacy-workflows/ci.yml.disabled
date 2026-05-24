@@ -1,0 +1,146 @@
+name: Archive CI — 32 checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+
+jobs:
+  archive-metadata:
+    name: Archive metadata and repository integrity
+    runs-on: ubuntu-latest
+    steps:
+      - name: "[01/32] Checkout"
+        uses: actions/checkout@v4
+
+      - name: "[02/32] README exists"
+        run: test -f README.md
+
+      - name: "[03/32] README declares final archived release"
+        run: grep -q "Final archived release" README.md
+
+      - name: "[04/32] README links canonical axonos-consent"
+        run: grep -q "github.com/AxonOS-org/axonos-consent" README.md
+
+      - name: "[05/32] README declares archive status"
+        run: grep -q "Archive status" README.md
+
+      - name: "[06/32] README declares third-party specification notice"
+        run: grep -q "Third-party specification notice" README.md
+
+      - name: "[07/32] README declares independent AxonOS implementation archive"
+        run: grep -q "independent AxonOS implementation archive" README.md
+
+      - name: "[08/32] README declares maintenance policy"
+        run: grep -q "Maintenance policy" README.md
+
+      - name: "[09/32] README does not point canonical consent to axonos-standard"
+        run: "! grep -q 'canonical.*axonos-standard' README.md"
+
+      - name: "[10/32] Cargo manifest exists"
+        run: test -f Cargo.toml
+
+      - name: "[11/32] Cargo package name is axonos-consent"
+        run: grep -q 'name = "axonos-consent"' Cargo.toml
+
+      - name: "[12/32] Cargo version is 0.2.2"
+        run: grep -q 'version = "0.2.2"' Cargo.toml
+
+      - name: "[13/32] Dual license files exist"
+        run: |
+          test -f LICENSE-APACHE
+          test -f LICENSE-MIT
+
+  rust-core:
+    name: Rust build, test, and lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: "[14/32] Checkout"
+        uses: actions/checkout@v4
+
+      - name: "[15/32] Install Rust stable"
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          targets: thumbv7em-none-eabihf
+
+      - name: "[16/32] Rustfmt"
+        run: cargo fmt --check
+
+      - name: "[17/32] Cargo check default"
+        run: cargo check
+
+      - name: "[18/32] Cargo check no-default-features"
+        run: cargo check --no-default-features
+
+      - name: "[19/32] Cargo check all features"
+        run: cargo check --all-features
+
+      - name: "[20/32] Unit and integration tests"
+        run: cargo test
+
+      - name: "[21/32] Feature-gated tests"
+        run: |
+          if grep -q '^json[[:space:]]*=' Cargo.toml; then
+            cargo test --features json
+          elif grep -q '^std[[:space:]]*=' Cargo.toml; then
+            cargo test --features std
+          else
+            cargo test
+          fi
+
+      - name: "[22/32] All-features tests"
+        run: cargo test --all-features
+
+      - name: "[23/32] Release build"
+        run: cargo build --release
+
+      - name: "[24/32] Bare-metal no_std build"
+        run: cargo build --target thumbv7em-none-eabihf --no-default-features
+
+      - name: "[25/32] Clippy default"
+        run: cargo clippy --all-targets -- -D clippy::all -A missing_docs -A missing_debug_implementations -A unused_extern_crates
+
+      - name: "[26/32] Clippy all features"
+        run: cargo clippy --all-targets --all-features -- -D clippy::all -A missing_docs -A missing_debug_implementations -A unused_extern_crates
+
+  archive-assurance:
+    name: Archive assurance and release readiness
+    runs-on: ubuntu-latest
+    steps:
+      - name: "[27/32] Checkout"
+        uses: actions/checkout@v4
+
+      - name: "[28/32] Install Rust stable"
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: "[29/32] Source tree exists"
+        run: |
+          test -d src
+          test -f src/lib.rs
+
+      - name: "[30/32] Forbid unsafe code marker"
+        run: grep -q '#!\[forbid(unsafe_code)\]' src/lib.rs
+
+      - name: "[31/32] Vector integrity SHA-256"
+        run: |
+          VECTOR="tests/vectors/consent-interop-vectors-v0.1.0.json"
+          EXPECTED="29a8bf9f2b4dabe5d9641a8a4c416f361c2ba9815cca9b8e9e1d222d002fa50a"
+          if [ -f "$VECTOR" ]; then
+            ACTUAL="$(sha256sum "$VECTOR" | awk '{print $1}')"
+            test "$EXPECTED" = "$ACTUAL"
+          else
+            echo "Vector file not present in this archive layout; skipping hash lock."
+          fi
+
+      - name: "[32/32] Cargo package dry run"
+        run: cargo package --allow-dirty --no-verify
