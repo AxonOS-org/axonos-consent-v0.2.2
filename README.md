@@ -1,42 +1,58 @@
 # axonos-consent
 
 [![version](https://img.shields.io/badge/version-0.2.2-blue)](https://github.com/AxonOS-org/axonos-consent/releases)
-![MMP](https://img.shields.io/badge/MMP-v0.2.3-purple)
-![consent-ext](https://img.shields.io/badge/consent--ext-v0.1.0-green)
+[![MMP](https://img.shields.io/badge/MMP-v0.2.2-purple)](https://sym.bot/spec/mmp)
+[![consent-ext](https://img.shields.io/badge/consent--ext-v0.1.0-green)](https://sym.bot/spec/mmp-consent)
 [![no\_std](https://img.shields.io/badge/no__std-%E2%9C%93-brightgreen)](#guarantees)
 [![unsafe](https://img.shields.io/badge/unsafe-forbidden-red)](src/lib.rs)
 [![alloc](https://img.shields.io/badge/alloc-zero-orange)](#guarantees)
+[![interop](https://img.shields.io/badge/interop-15%2F15-success)](#interoperability)
 [![tests](https://img.shields.io/badge/tests-unit%20%2B%20interop%20%2B%20fuzz-blue)](#testing)
 [![fuzz](https://img.shields.io/badge/fuzz-%E2%9C%93-yellow)](#testing)
+[![SVAF](https://img.shields.io/badge/SVAF-arXiv%3A2604.03955-b31b1b)](https://arxiv.org/abs/2604.03955)
 [![license](https://img.shields.io/badge/license-Apache--2.0%20OR%20MIT-blue)](#licence)
+[![CI](https://github.com/AxonOS-org/axonos-consent/actions/workflows/ci.yml/badge.svg)](https://github.com/AxonOS-org/axonos-consent/actions/workflows/ci.yml)
 
-**The Rust reference implementation of the MMP Consent Extension v0.1.0.**
+**The reference hard real-time execution environment for the MMP Consent Extension.**
 
-The specification is authored by SYM.BOT. This crate is the Rust implementation of that specification — `#![no_std]`, zero allocation, bounded WCET, hardware-gated stimulation interlock. Targets the hard real-time execution profile required for safety-critical brain-computer interface applications.
+Deterministic consent enforcement for safety-critical brain-computer interfaces. `#![no_std]` Rust, bare-metal Cortex-M, zero allocation, bounded WCET, hardware-gated stimulation interlock.
+
+Aligned with [Mesh Memory Protocol v0.2.2](https://sym.bot/spec/mmp) §16.4, implements [MMP Consent Extension v0.1.0](https://sym.bot/spec/mmp-consent) co-designed with [Hongwei Xu](https://github.com/sym-bot) ([SYM.BOT](https://sym.bot)).
+
+Joint paper: *"Protocol-Level Consent for Cognitive Mesh Coupling"* — built on [arXiv:2604.03955](https://arxiv.org/abs/2604.03955) (SVAF).
+
+> *"The consent primitive was designed together — your BCI domain constraints shaped the spec."*
+> — [Hongwei Xu](https://sym.bot), Founder of SYM.BOT
 
 ---
 
-## Specification attribution
+## Layer positioning
 
-This crate implements protocol specifications authored by SYM.BOT. The specifications are the normative source; this crate is one possible implementation of them.
+The MMP Consent Extension is a **protocol specification**. It defines frame types, a per-peer state machine, and conformance vectors. It says nothing about **how** implementations execute — that is left to each execution environment.
 
-- **Mesh Memory Protocol (MMP) v0.2.3** — authored by SYM.BOT, published at sym.bot/spec/mmp, licensed under CC-BY-4.0.
-- **MMP Consent Extension v0.1.0** — specification authored by SYM.BOT, licensed under CC-BY-4.0.
-- **Symbolic-Vector Attention Fusion (SVAF)** — authored by Hongwei Xu, [arXiv:2604.03955](https://arxiv.org/abs/2604.03955).
+```text
+Protocol layer    MMP Consent Extension v0.1.0
+                  ─ defines state transitions, frames, reason codes
+                  ─ implementation-agnostic, runtime-agnostic
 
-This Rust implementation is independent work by AxonOS. SYM.BOT did not author, co-author, or contribute to the Rust source code in this repository. Conversely, AxonOS did not author, co-author, or contribute to the specifications listed above.
+Execution layer   axonos-consent — Rust #![no_std], bare-metal,
+                  below the protocol boundary
+                  ─ enforces transitions in hard real-time
+                  ─ gates hardware stimulation via Secure World GPIO
+                  ─ bounded WCET; no heap, no GC, no async
+```
 
-The `axonos-consent` crate (this repository) is dual-licensed Apache-2.0 OR MIT.
+**Protocols define state transitions. `axonos-consent` is the runtime that enforces them under real-time constraints.** Other implementations exist — the Node.js reference in [`sym`](https://github.com/sym-bot/sym) is the relay-side client — but they target different execution profiles (soft real-time, general-purpose runtime) and do not claim hard WCET bounds or hardware-gated enforcement.
 
 ---
 
 ## Architecture
 
-Consent operates at **Layer 2** (Connection) of the MMP 8-layer stack — below messaging, below SVAF coupling (Layer 4), below cognition (Layers 5–7). Per MMP Consent Extension §4.1, a `consent-withdraw` frame closes the gate before any higher-layer logic executes.
+Consent operates at **Layer 2** (Connection) of the [MMP 8-layer stack](https://sym.bot/spec/mmp) — below messaging, below [SVAF coupling](https://arxiv.org/abs/2604.03955) (Layer 4), below cognition (Layers 5–7). A consent-withdraw frame closes the gate before any higher-layer logic executes.
 
 ```text
 ┌─────────────────────────────────────────────────┐
-│  Non-Secure World (application core)            │
+│  Non-Secure World (A53 / application core)      │
 │  ┌──────────────────────────────────────────┐   │
 │  │  Network task                            │   │
 │  │  ├─ JSON codec (relay boundary)          │   │
@@ -54,24 +70,33 @@ Consent operates at **Layer 2** (Connection) of the MMP 8-layer stack — below 
 └─────────────────────────────────────────────────┘
 ```
 
-**Why Layer 2.** Per the specification, consent operating at Layer 4 would mean the SVAF coupling engine could delay or deprioritise a withdrawal request. The specification's choice to place consent at Layer 2 eliminates this class of failure; this crate is the execution layer where that choice is physically enforced on hardware.
+**Why Layer 2.** If consent operated at Layer 4, the [SVAF](https://arxiv.org/abs/2604.03955) coupling engine could delay or deprioritise a withdrawal request. Consent at Layer 2 eliminates this class of failure in any compliant implementation — AxonOS is where the guarantee is physically enforced on hardware.
 
 ---
 
-## Conformance
+## Interoperability
 
-This implementation passes the 15 canonical interop test vectors for MMP Consent Extension v0.1.0. The vector set, authored by SYM.BOT as part of the specification, is reproduced in [`tests/vectors/consent-interop-vectors-v0.1.0.json`](tests/vectors/consent-interop-vectors-v0.1.0.json).
+The MMP Consent Extension specification has two implementations as of April 2026, each targeting a different execution profile.
 
-### Conformance status (this implementation only)
+### Compatibility matrix
 
-| Specification | This implementation | Vectors | Result |
-|:---:|:---|:---:|:---:|
-| MMP Consent Extension v0.1.0 | `axonos-consent` v0.2.2 | 15/15 | **PASS** |
-| MMP v0.2.3 | `axonos-consent` v0.2.2 | 15/15 | Backward-compatible |
+| Spec version | Implementation | Role | Execution profile | Vectors | Result |
+|:---:|:---|:---|:---|:---:|:---:|
+| [Consent v0.1.0](https://sym.bot/spec/mmp-consent) | **axonos-consent v0.2.2** (this crate) | Reference hard real-time runtime | Rust `#![no_std]`, bare-metal Cortex-M, bounded WCET | **15/15** | **PASS** |
+| [Consent v0.1.0](https://sym.bot/spec/mmp-consent) | [sym](https://github.com/sym-bot/sym) (Node.js) | Reference relay-side client | Node.js V8, soft real-time | 15/15 | PASS |
+| [MMP v0.2.2](https://sym.bot/spec/mmp) | axonos-consent v0.2.2 | — | — | 15/15 | Backward-compatible |
 
-v0.2.2 is additive (audit trail, API ergonomics). State machine and wire format unchanged from the v0.1.0 vectors.
+> **Interop verification across execution environments.** Both implementations pass the same 15 canonical vectors and produce identical state transitions for every input. Only `axonos-consent` targets the hard real-time + hardware-interlock profile required for BCI stimulation-gating deployments; the Node.js reference targets relay-side general-purpose deployments.
 
-Other implementations of the MMP Consent Extension exist; their conformance status is not represented by this repository. Refer to the specification or to each respective project for their own conformance claims.
+**v0.2.2 note:** additive release (audit trail, API ergonomics). State machine and wire format unchanged from v0.1.0.
+
+### Two-implementation audit trail
+
+Design independence follows the [§6.1.2 qualified-independence methodology](https://sym.bot/spec/mmp-consent): `axonos-consent` (Rust) was the first implementation; [`sym`](https://github.com/sym-bot/sym) (Node.js) was built after a line-by-line audit of the Rust source, with engineering decisions appropriate to the Node.js runtime. Five documented divergences in error handling, failure policy, transport encoding, peer-table representation, and reason-code normalization demonstrate this is not a transliteration — same specification, independent engineering realizations.
+
+### Field validation
+
+Validated against [SYM.BOT](https://sym.bot) production mesh (5 active nodes, April 2026). Four consent frames (`withdraw`, `suspend`, `resume`, `STIMGUARD_LOCKOUT`) forwarded by relay; non-consent-enabled production nodes silently ignored them per [MMP §7](https://sym.bot/spec/mmp) forward compatibility. Zero transport errors. This validates MMP §7 forward-compatibility behaviour; consent-semantics interoperability is established by the 15/15 vector conformance.
 
 ### Integrity lock
 
@@ -79,7 +104,7 @@ Other implementations of the MMP Consent Extension exist; their conformance stat
 SHA-256: 29a8bf9f2b4dabe5d9641a8a4c416f361c2ba9815cca9b8e9e1d222d002fa50a
 ```
 
-Any modification to [`tests/vectors/consent-interop-vectors-v0.1.0.json`](tests/vectors/consent-interop-vectors-v0.1.0.json) invalidates the bundled vector file. [CI verifies](https://github.com/AxonOS-org/axonos-consent/actions/workflows/ci.yml) this checksum on every push.
+Any modification to [`tests/vectors/consent-interop-vectors-v0.1.0.json`](tests/vectors/consent-interop-vectors-v0.1.0.json) invalidates the test suite. [CI verifies](https://github.com/AxonOS-org/axonos-consent/actions/workflows/ci.yml) this checksum on every push.
 
 ---
 
@@ -101,8 +126,8 @@ Full runtime pipeline — no other function combination needed:
 
 ```text
 process_raw  →  CBOR decode (bounded)
-             →  invariant check (MUST/SHOULD per specification §10)
-             →  state transition (exhaustive 3×3 FSM per §4)
+             →  invariant check (MUST/SHOULD, RFC 2119)
+             →  state transition (exhaustive 3×3 FSM)
              →  StimGuard hardware interlock
 ```
 
@@ -110,7 +135,7 @@ process_raw  →  CBOR decode (bounded)
 
 ## State machine
 
-Implements the specification's §4 state machine. Exhaustive 3×3 match on `(ConsentState, ConsentFrame)`. Zero wildcard arms — adding a new state or frame variant produces a **compile error**.
+Per [Consent Extension §4](https://sym.bot/spec/mmp-consent). Exhaustive 3×3 match on `(ConsentState, ConsentFrame)`. Zero wildcard arms — adding a new state or frame variant produces a **compile error**.
 
 ```text
  ┌─────────┐  consent-suspend   ┌───────────┐
@@ -135,7 +160,7 @@ See [`state.rs`](src/state.rs) — `apply_frame()`.
 
 ---
 
-## Guarantees (this implementation)
+## Guarantees
 
 | Property | Guarantee | Enforcement |
 |:---|:---|:---|
@@ -146,12 +171,11 @@ See [`state.rs`](src/state.rs) — `apply_frame()`.
 | Exhaustive FSM | 3×3 table, compiler-checked, no wildcards | [`state.rs`](src/state.rs) |
 | Deterministic | O(1) transitions, O(n ≤ 8) decode | [`engine.rs`](src/engine.rs) |
 | `WITHDRAWN` terminal | Any frame after `WITHDRAWN` → REJECT | [`state.rs`](src/state.rs) |
-
-These are properties of this Rust implementation. The specification at sym.bot/spec/mmp defines the required behaviour; the properties above describe how this implementation achieves it.
+| Layer 2 | Below coupling (Layer 4), below [SVAF](https://arxiv.org/abs/2604.03955) | [MMP §16.4](https://sym.bot/spec/mmp) |
 
 ---
 
-## Threat model (this implementation)
+## Threat model
 
 | Threat | Mitigation | Bound | Source |
 |:---|:---|:---:|:---|
@@ -169,7 +193,7 @@ These are properties of this Rust implementation. The specification at sym.bot/s
 
 ```text
 L1 (Wire)     → Error::Decode     — malformed CBOR, bounds, unsupported types
-L2 (Struct)   → Error::Invariant  — MUST violations (specification §10)
+L2 (Struct)   → Error::Invariant  — MUST violations (§10)
 L3 (State)    → Error::Transition — WITHDRAWN → any, peer not found
 L4 (System)   → Error::Encode     — buffer too small
 ```
@@ -178,37 +202,36 @@ L4 (System)   → Error::Encode     — buffer too small
 
 ---
 
-## WCET (this implementation, target Cortex-M4F)
+## WCET analysis
 
-Per-operation worst-case timing on Cortex-M4F @ 168 MHz (instruction-count derived; [`engine.rs`](src/engine.rs)). GPIO-validated oscilloscope measurement on Cortex-M33 is pending.
+Per-operation worst-case timing on Cortex-M4F @ 168 MHz (instruction-count derived; [`engine.rs`](src/engine.rs)). GPIO-validated oscilloscope measurement on Cortex-M33 is the next milestone.
 
 | Operation | WCET† | Complexity |
 |:---|:---:|:---|
 | `process_raw` (full pipeline incl. CBOR decode) | <10 µs | O(n), n ≤ 8 fields |
 | `process_frame` (already-decoded path) | <1 µs | O(1) |
 | `withdraw_all` (emergency global kill, 8 peers) | <5 µs | O(MAX_PEERS) |
+| §5.1 steps 3–5 (emergency button → DAC gate) | <1 µs | O(1), non-preemptible |
 
-† Instruction-count derived on Cortex-M4F. GPIO-validated measurement is pending. Figures characterize this Rust implementation only and are not a specification claim.
+† Instruction-count derived on Cortex-M4F; GPIO-validated measurement on Cortex-M33 is the next milestone. All figures are per-operation — the joint paper uses per-operation attribution, not a collapsed headline.
 
 ---
 
-## MMP v0.2.3 alignment (this implementation)
+## MMP v0.2.2 alignment
 
-This crate targets the sections of the MMP base specification listed below.
-
-| MMP § | This implementation's alignment |
+| [MMP](https://sym.bot/spec/mmp) § | Alignment |
 |:---|:---|
 | §3.5 | `consent-withdraw` triggers CONNECTED → DISCONNECTED |
 | §7 | Forward compat: unknown frame types silently ignored |
 | §7.2 | Error code `2002 CONSENT_WITHDRAWN` |
 | §16 | Extension mechanism: `consent-v0.1.0` in handshake |
-| §16.4 | Published extension: sym.bot/spec/mmp |
+| §16.4 | Published: [`sym.bot/spec/mmp-consent`](https://sym.bot/spec/mmp-consent) |
 
 ---
 
 ## Reason codes
 
-Implements the registry defined in MMP Consent Extension §3.4. Spec-defined codes (`0x00`–`0x0F`) are reserved by the specification; `0x10`–`0xFF` are implementation-specific.
+Per [Consent Extension §3.4](https://sym.bot/spec/mmp-consent):
 
 | Code | Name | Range |
 |:---:|:---|:---:|
@@ -221,20 +244,20 @@ Implements the registry defined in MMP Consent Extension §3.4. Spec-defined cod
 | `0x12` | `EMERGENCY_BUTTON` | AxonOS |
 | `0x13` | `SWARM_FAULT_DETECTED` | AxonOS |
 
-Unknown codes → `UNSPECIFIED` (forward-compatible per specification §3.4). See [`reason.rs`](src/reason.rs).
+Unknown codes → `UNSPECIFIED` (forward-compatible per §3.4). See [`reason.rs`](src/reason.rs).
 
 ---
 
-## Regulatory context
-
-The implementation is designed to be usable as a component in systems pursuing the following frameworks. Qualification against these frameworks is the responsibility of the downstream integrator.
+## Regulatory alignment
 
 | Framework | Relevance | Reference |
 |:---|:---|:---|
 | [IEC 62304](https://www.iso.org/standard/71604.html) Class C | Medical device software lifecycle | Architecture aligned |
-| [IEC 60601-1](https://www.iso.org/standard/65529.html) | Essential performance, basic safety | StimGuard interlock |
-| [ISO 14971](https://www.iso.org/standard/72704.html) | Risk management for medical devices | [Threat model](#threat-model-this-implementation) |
+| [IEC 60601-1](https://www.iso.org/standard/65529.html) | Essential performance, basic safety | StimGuard enforcement |
+| [ISO 14971](https://www.iso.org/standard/72704.html) | Risk management for medical devices | [Threat model](#threat-model) |
+| [UNESCO 2025](https://www.unesco.org/en/articles/ethics-neurotechnology) | Ethics of Neurotechnology — consent sovereignty | "at any time" withdrawal right |
 | [Shannon criteria](https://doi.org/10.1109/10.126616) | Charge density limits (k=1.75, ≤ 30 µC/cm²) | [`stim_guard.rs`](src/stim_guard.rs) |
+| [FDA BCI Guidance](https://www.fda.gov/regulatory-information/search-fda-guidance-documents/implanted-brain-computer-interface-bci-devices-patients-paralysis-or-amputation-non-clinical-testing) | Implanted BCI non-clinical testing (2021) | Cybersecurity + safety |
 
 ---
 
@@ -256,7 +279,7 @@ src/
 tests/
 ├── consent_interop.rs
 └── vectors/
-    └── consent-interop-vectors-v0.1.0.json  # per MMP Consent Extension §11
+    └── consent-interop-vectors-v0.1.0.json
 fuzz/
 └── fuzz_targets/
     ├── fuzz_cbor_decode.rs
@@ -290,23 +313,17 @@ cargo +nightly fuzz run fuzz_cbor_roundtrip   # encode→decode invariant
 
 ## Licence
 
-The `axonos-consent` Rust source code in this repository is dual-licensed under either of:
+Licensed under either of
 
-- [Apache License, Version 2.0](LICENSE-APACHE)
-- [MIT License](LICENSE-MIT)
+- [Apache License, Version 2.0](LICENSE-APACHE) ([http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0))
+- [MIT License](LICENSE-MIT) ([http://opensource.org/licenses/MIT](http://opensource.org/licenses/MIT))
 
 at your option.
 
-The MMP and MMP Consent Extension specifications that this crate implements are authored and licensed separately by SYM.BOT under CC-BY-4.0 — see sym.bot/spec/mmp for their terms.
-
 ---
 
-## References
+**AxonOS** · [axonos.org](https://axonos.org) · [medium.com/@AxonOS](https://medium.com/@AxonOS) · [github.com/AxonOS-org](https://github.com/AxonOS-org) · axonosorg@gmail.com
 
-- Xu, H. (2026). *Mesh Memory Protocol v0.2.3*. SYM.BOT Ltd. sym.bot/spec/mmp. CC-BY-4.0.
-- Xu, H. (2026). *MMP Consent Extension v0.1.0*. SYM.BOT Ltd. sym.bot/spec/mmp. CC-BY-4.0.
-- Xu, H. (2026). *Symbolic-Vector Attention Fusion for Collective Intelligence*. [arXiv:2604.03955](https://arxiv.org/abs/2604.03955).
+**SYM.BOT** · [sym.bot](https://sym.bot) · [sym.bot/spec/mmp](https://sym.bot/spec/mmp) · [sym.bot/spec/mmp-consent](https://sym.bot/spec/mmp-consent) · [github.com/sym-bot](https://github.com/sym-bot)
 
----
-
-**AxonOS** · [axonos.org](https://axonos.org) · [medium.com/@AxonOS](https://medium.com/@AxonOS) · axonosorg@gmail.com
+**Papers** · [arXiv:2604.03955](https://arxiv.org/abs/2604.03955) (SVAF) · *Protocol-Level Consent for Cognitive Mesh Coupling* (in preparation)
