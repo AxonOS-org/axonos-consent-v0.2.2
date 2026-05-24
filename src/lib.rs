@@ -6,12 +6,10 @@
 
 //! # axonos-consent
 //!
-//! MMP Consent Extension v0.1.0 — Rust reference implementation.
-//! Aligned with MMP v0.2.3 (Section 16.4).
+//! MMP Consent Extension v0.1.0 — reference implementation.
+//! Aligned with MMP v0.2.2 (Section 16.4).
 //!
-//! Specification: MMP Consent Extension v0.1.0 — authored by SYM.BOT,
-//! published under CC-BY-4.0.
-//!
+//! Spec: <https://sym.bot/spec/mmp-consent>
 //! Protocol version: `CONSENT_PROTOCOL_VERSION = 1`
 //!
 //! ## Single entry point

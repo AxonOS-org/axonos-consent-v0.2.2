@@ -9,7 +9,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 ## [0.2.2] — 2026-04-12
 
 ### Added
-- `WithdrawAllResult` struct returned by `withdraw_all()` — includes `[Option<PeerId>; MAX_PEERS]` + count for WCET-safe audit trail. Zero-alloc discipline preserved.
+- `WithdrawAllResult` struct returned by `withdraw_all()` — includes `[Option<PeerId>; MAX_PEERS]` + count for WCET-safe audit trail. Zero-alloc discipline preserved (per Hongwei Xu's v0.1.0 field review feedback).
 - `#![warn(missing_docs)]`, `#![warn(missing_debug_implementations)]`, `#![warn(rust_2018_idioms)]` at crate root.
 - `html_root_url` for docs.rs links.
 - Complete Cargo.toml metadata: `homepage`, `documentation`, `include` list.
@@ -41,7 +41,7 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [S
 
 ## [0.1.0] — 2026-04-04
 
-Initial release. Rust implementation of the MMP Consent Extension v0.1.0 specification (authored by SYM.BOT, CC-BY-4.0).
+Initial release. Co-designed with Hongwei Xu (SYM.BOT) against the MMP Consent Extension v0.1.0 specification.
 
 ### Added
 - Exhaustive 3×3 state machine (GRANTED / SUSPENDED / WITHDRAWN × Withdraw / Suspend / Resume).
