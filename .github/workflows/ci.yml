@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: archive-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  archive-gate:
+    name: "${{ matrix.id }} · ${{ matrix.title }}"
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - id: "01"
+            title: "Repository surface"
+          - id: "02"
+            title: "Archive notice"
+          - id: "03"
+            title: "README presence"
+          - id: "04"
+            title: "License surface"
+          - id: "05"
+            title: "Cargo metadata advisory"
+          - id: "06"
+            title: "Rust format advisory"
+          - id: "07"
+            title: "Rust tests advisory"
+          - id: "08"
+            title: "No obvious secrets"
+          - id: "09"
+            title: "No generated artifacts"
+          - id: "10"
+            title: "Markdown surface"
+          - id: "11"
+            title: "Security surface"
+          - id: "12"
+            title: "IP and ownership surface"
+          - id: "13"
+            title: "Version/reference surface"
+          - id: "14"
+            title: "File size sanity"
+          - id: "15"
+            title: "Workflow syntax surface"
+          - id: "16"
+            title: "Archive status document"
+          - id: "17"
+            title: "Final archival readiness"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Run archive validation gate
+        run: python3 tools/archive_ci_gate.py "${{ matrix.id }}"
